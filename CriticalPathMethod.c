@@ -27,7 +27,7 @@ I, Nicholas Lasagna, have completed this assignment with my partner, Manuel Pere
 typedef struct Activity {
     char id;
     char name[64];
-    int  s, t;
+    int  src, t;
     int  dur;
 } Activity;
 
@@ -62,15 +62,16 @@ static void addEdge(int u,int v,int w) {
 // Can read file and if error exit program.
 static void readFile(const char *fname) {
     FILE *fp = fopen(fname,"r");
-    if(!fp){ perror("file"); exit(1); }
+    if(!fp)
+        perror("file"); exit(1);
 
     fscanf(fp,"%d",&actCnt);
     for(int i=0;i<actCnt;i++)
     {
         fscanf(fp," %c %63s %d %d %d",
                &act[i].id,act[i].name,
-               &act[i].s,&act[i].t,&act[i].dur);
-        addEdge(act[i].s,act[i].t,act[i].dur);
+               &act[i].src,&act[i].t,&act[i].dur);
+        addEdge(act[i].src,act[i].t,act[i].dur);
     }
     fclose(fp);
 }
@@ -78,58 +79,93 @@ static void readFile(const char *fname) {
 // Used to pass earliest
 
 static void forwardPass(void) {
-    int q[MAX_NODE], head=0, tail=0;
+    int queue[MAX_NODE], head = 0, tail = 0;
+    int indegCopy[MAX_NODE];
 
-    for(int v=1; v<=nodeCnt; ++v){
-        earliest[v]=0;
-        parent  [v]=0;
-        if(!indeg[v]) q[tail++]=v;
+    /* copy indeg so we don't destroy it for backwardPass */
+    memcpy(indegCopy, indeg, sizeof indeg);
+
+    for (int v = 1; v <= nodeCnt; v++) {
+        earliest[v] = 0;
+        parent[v]   = 0;
+        if (indegCopy[v] == 0) {
+            queue[tail++] = v;
+        }
     }
-    while(head<tail){
-        int u=q[head++];
-        for(Edge*e=g[u]; e; e=e->nxt){
-            if(earliest[u]+e->w > earliest[e->to]){
-                earliest[e->to] = earliest[u]+e->w;
-                parent  [e->to] = u;
+
+    while (head < tail) {
+        int u = queue[head++];
+        for (Edge *e = g[u]; e; e = e->nxt) {
+            int cand = earliest[u] + e->w;
+            if (cand > earliest[e->to]) {
+                earliest[e->to] = cand;
+                parent[e->to]   = u;
             }
-            if(--indeg[e->to]==0) q[tail++]=e->to;
+            if (--indegCopy[e->to] == 0) {
+                queue[tail++] = e->to;
+            }
         }
     }
 }
 
 // This is used to pass latest
 static void backwardPass(void) {
-    for(int v=1; v<=nodeCnt; ++v) latest[v] = earliest[nodeCnt]; /* init */
+    for (int v = 1; v <= nodeCnt; v++) {
+        latest[v] = earliest[nodeCnt];
+    }
 
     // Destroyed indeg[], but we don’t need it anymore.
     // Walk nodes from high→low index ≈ reverse topo because sources
     // are low‑numbered in these datasets.
-    for(int u=nodeCnt; u>=1; --u)
-        for(Edge*e=g[u]; e; e=e->nxt)
-            if(latest[e->to]-e->w < latest[u])
-                latest[u] = latest[e->to]-e->w;
+    for (int u = nodeCnt; u >= 1; u--) {
+        for (Edge *e = g[u]; e; e = e->nxt) {
+            int cand = latest[e->to] - e->w;
+            if (cand < latest[u]) {
+                latest[u] = cand;
+            }
+        }
+    }
 
-    for(int v=1; v<=nodeCnt; ++v) slack[v] = latest[v]-earliest[v];
+    for (int v = 1; v <= nodeCnt; v++) {
+        slack[v] = latest[v] - earliest[v];
+    }
 }
 
 // Print data to display: Node, Earliest Time, Latest Start Time, and Slack time.
 static void printResults(void) {
     puts("");
-    printf("%-6s %-20s %-20s %-10s\n",
-           "Node","Earliest Start","Latest Start","Slack");
-    puts("--------------------------------------------------------------");
-    for(int v=1; v<=nodeCnt; ++v)
-        printf("%-6d %-20d %-20d %-10d\n",
+    printf("%-6s %-18s %-18s %-10s\n",
+           "Node", "Earliest Start", "Latest Start", "Slack");
+    printf("----------------------------------------------------------\n");
+    for (int v = 1; v <= nodeCnt; v++) {
+        printf("%-6d %-18d %-18d %-10d\n",
                v, earliest[v], latest[v], slack[v]);
+    }
 
-    // rebuild critical path by following parent[] backwards
-    int path[MAX_NODE], len=0, cur=nodeCnt;
-    while(cur){ path[len++]=cur; cur=parent[cur]; }
+    /* reconstruct critical path by following parent[] back from sink */
+    int path[MAX_NODE], len = 0;
+    for (int cur = nodeCnt; cur != 0; cur = parent[cur]) {
+        path[len++] = cur;
+    }
 
-    puts("\nCritical path is:");
-    for(int i=len-1;i>=0;--i)
-        printf("%d%s", path[i], i? " -> ":"\n");
-    printf("Path length: %d\n", earliest[nodeCnt]);
+    printf("\nCritical path is: ");
+    for (int i = len - 1; i >= 0; i--) {
+        printf("%d%s", path[i], (i > 0) ? " -> " : "\n");
+    }
+    printf("Path length: %d\n\n", earliest[nodeCnt]);
+}
+
+// Makes Edge look better
+static void cleanup(void) {
+    for (int u = 1; u <= nodeCnt; u++) {
+        Edge *e = g[u];
+        while (e) {
+            Edge *nx = e->nxt;
+            free(e);
+            e = nx;
+        }
+        g[u] = NULL;
+    }
 }
 
 // Main function
@@ -138,5 +174,6 @@ int main(void) {
     forwardPass();
     backwardPass();
     printResults();
+    cleanup();
     return 0;
 }
