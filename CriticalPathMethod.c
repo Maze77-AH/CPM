@@ -1,7 +1,4 @@
 /*
- ============================================================================
-  Critical Path Method Solver   |   CS 2413 – Spring 2025
-  ---------------------------------------------------------------------------
   Contribution Summary:
   I, Nicholas Lasagna, have completed this assignment with my partner,
   Manuel Perez. I wrote debugged logic errors, and tested the solution for
@@ -30,26 +27,25 @@
   the table, refactored code layout, improved variable names, and added
   documentation.
   
-  ---------------------------------------------------------------------------
   Extra-credit delivered
     1. Cycle detection + user-friendly abort
     2. Graphviz export highlighting the critical path
     3. Filename override via command-line argument
- ============================================================================
 */
 
+// Our GitHub: https://github.com/Maze77-AH/CPM
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 
-/* ---- configuration ---------------------------------------------------- */
+// configuration
 #define MAX_ACT      100
 #define MAX_NODE     100
 #define INPUT_FILE   "furniture.txt"         
 
-/* ---- data types -------------------------------------------------------- */
+// data types
 typedef struct Activity {
     char id;
     char name[64];
@@ -62,58 +58,58 @@ typedef struct Edge {
     struct Edge *nxt;
 } Edge;
 
-/* ---- globals ----------------------------------------------------------- */
+// global vars
 static Activity act[MAX_ACT];
-static Edge   *head[MAX_NODE + 1] = {NULL};
-static Edge   *tail_[MAX_NODE + 1] = {NULL};
-static int     indeg [MAX_NODE + 1] = {0};
-static int     earliest[MAX_NODE + 1] = {0};
-static int     latest  [MAX_NODE + 1] = {0};
-static int     slack   [MAX_NODE + 1] = {0};
-static int     parent  [MAX_NODE + 1] = {0};
-static int     topo    [MAX_NODE + 1] = {0};
+static Edge *head[MAX_NODE + 1] = {NULL};
+static Edge *tail_[MAX_NODE + 1] = {NULL};
+static int indeg [MAX_NODE + 1] = {0};
+static int earliest[MAX_NODE + 1] = {0};
+static int latest [MAX_NODE + 1] = {0};
+static int slack [MAX_NODE + 1] = {0};
+static int parent [MAX_NODE + 1] = {0};
+static int topo [MAX_NODE + 1] = {0};
 
-static int actCnt  = 0;
+static int actCnt = 0;
 static int nodeCnt = 0;
 static int topoLen = 0;
 
-/* ---- helpers ----------------------------------------------------------- */
-static void addEdge(int u, int v, int w)
-{
+// helpers
+// Add directed, weighted edge to adjacency list and track indegree
+static void addEdge(int u, int v, int w) {
     Edge *e = malloc(sizeof *e);
     if (!e) { perror("malloc"); exit(EXIT_FAILURE); }
     e->to = v; e->w = w; e->nxt = NULL;
 
-    if (!head[u]) head[u] = tail_[u] = e;
-    else          tail_[u]->nxt = e, tail_[u] = e;
+    if (!head[u])
+        head[u] = tail_[u] = e;
+    else
+        tail_[u]->nxt = e, tail_[u] = e;
 
     indeg[v]++;
-    if (u > nodeCnt) nodeCnt = u;
-    if (v > nodeCnt) nodeCnt = v;
+    // update node count to include both endpoints
+    if (u > nodeCnt)
+        nodeCnt = u;
+    if (v > nodeCnt)
+        nodeCnt = v;
 }
 
-/* ------------------------------------------------------------------
-   Read CPM file:
-   • first line = vertex count (used for sanity only)
-   • remaining lines = activities until EOF
--------------------------------------------------------------------*/
-static void readFile(const char *fname)
-{
+// read cpm file:
+// Read file of activities; build graph and populate act array
+static void readFile(const char *fname) {
     FILE *fp = fopen(fname, "r");
     if (!fp) { perror(fname); exit(EXIT_FAILURE); }
 
+    // first number is count of activities
     int nodeCntHint = 0;
-    if (fscanf(fp, "%d", &nodeCntHint) != 1 ||
-        nodeCntHint < 2 || nodeCntHint > MAX_NODE)
-    {
+    if (fscanf(fp, "%d", &nodeCntHint) != 1 || nodeCntHint < 2 || nodeCntHint > MAX_NODE){
         fprintf(stderr, "Bad vertex count on first line\n");
         exit(EXIT_FAILURE);
     }
 
-    /* discard rest of first line */
+    // discard rest of first line
     int ch;
-    while ((ch = fgetc(fp)) != '\n' && ch != EOF) /* skip */;
-
+    while ((ch = fgetc(fp)) != '\n' && ch != EOF);
+    // this reads each activity line and add its edge
     char line[256];
     actCnt = 0;
     while (fgets(line, sizeof line, fp)) {
@@ -124,12 +120,9 @@ static void readFile(const char *fname)
             exit(EXIT_FAILURE);
         }
 
-        if (sscanf(line, " %c %63s %d %d %d",
-                   &act[actCnt].id, act[actCnt].name,
-                   &act[actCnt].src, &act[actCnt].dest,
-                   &act[actCnt].dur) != 5)
+        if (sscanf(line, " %c %63s %d %d %d", &act[actCnt].id, act[actCnt].name, &act[actCnt].src, &act[actCnt].dest, &act[actCnt].dur) != 5)
         {
-            fprintf(stderr, "Malformed activity line near: %s", line);
+            fprintf(stderr, "Error activity line: %s", line);
             exit(EXIT_FAILURE);
         }
 
@@ -138,16 +131,11 @@ static void readFile(const char *fname)
     }
     fclose(fp);
 
-    if (nodeCntHint != nodeCnt) {
-        fprintf(stderr,
-                "Warning: file says %d vertices, but activities reference up to %d\n",
-                nodeCntHint, nodeCnt);
-    }
+    if (nodeCntHint != nodeCnt)
+        fprintf(stderr, "Warning: file says %d vertices, but activities reference up to %d\n", nodeCntHint, nodeCnt);
 }
 
-/* ---- CPM passes -------------------------------------------------------- */
-static void forwardPass(void)
-{
+static void forwardPass(void) {
     int q[MAX_NODE + 1], h = 0, t = 0;
     int indegTmp[MAX_NODE + 1];
     memcpy(indegTmp, indeg, sizeof indegTmp);
@@ -166,7 +154,8 @@ static void forwardPass(void)
                 earliest[e->to] = earliest[u] + e->w;
                 parent [e->to]  = u;
             }
-            if (--indegTmp[e->to] == 0) q[t++] = e->to;
+            if (--indegTmp[e->to] == 0)
+                q[t++] = e->to;
         }
     }
 
@@ -176,55 +165,49 @@ static void forwardPass(void)
     }
 }
 
-static void backwardPass(void)
-{
+// Backward pass: compute latest start times and slack
+static void backwardPass(void) {
     const int projectLen = earliest[nodeCnt];
+    // initialize latest[] to project length
     for (int v = 1; v <= nodeCnt; ++v) latest[v] = projectLen;
-
+    // traverse topo in reverse
     for (int i = topoLen - 1; i >= 0; --i) {
         int u = topo[i];
         for (Edge *e = head[u]; e; e = e->nxt)
             if (latest[e->to] - e->w < latest[u])
                 latest[u] = latest[e->to] - e->w;
     }
+    // slack = latest - earliest for each node
     for (int v = 1; v <= nodeCnt; ++v)
         slack[v] = latest[v] - earliest[v];
 }
 
-/* ---- printing & cleanup ------------------------------------------------ */
-static void printActivityList(void)
-{
+static void printActivityList(void) {
     puts("\nActivities (ID, Name, Src, Dest, Dur)");
     puts("---------------------------------------");
     for (int i = 0; i < actCnt; ++i)
-        printf(" %c  %-20s %2d → %2d   %3d\n",
-               act[i].id, act[i].name,
-               act[i].src, act[i].dest, act[i].dur);
+        printf(" %c  %-20s %2d → %2d   %3d\n", act[i].id, act[i].name, act[i].src, act[i].dest, act[i].dur);
 }
 
-static void exportDot(void)
-{
+static void exportDot(void) {
     FILE *fp = fopen("cpm.dot", "w");
     if (!fp) { perror("cpm.dot"); return; }
 
     fputs("digraph CPM {\n  rankdir=LR;\n", fp);
     for (int u = 1; u <= nodeCnt; ++u)
         for (Edge *e = head[u]; e; e = e->nxt) {
-            bool crit = (earliest[u] == latest[u] &&
-                         earliest[e->to] == latest[e->to] &&
-                         slack[u] == 0 && slack[e->to] == 0);
-            fprintf(fp, "  %d -> %d [label=\"%d\"%s];\n",
-                    u, e->to, e->w, crit ? ", color=red, penwidth=2" : "");
+            bool crit = (earliest[u] == latest[u] && earliest[e->to] == latest[e->to] && slack[u] == 0 && slack[e->to] == 0);
+            fprintf(fp, "  %d -> %d [label=\"%d\"%s];\n", u, e->to, e->w, crit ? ", color=red, penwidth=2" : "");
         }
     fputs("}\n", fp);
     fclose(fp);
     puts("DOT file 'cpm.dot' written.");
 }
 
-static void printResults(void)
-{
-    puts("\nNode  Earliest  Latest    Slack");
-    puts("--------------------------------");
+// Print results table and critical path
+static void printResults(void) {
+    puts("\nNode  Earliest Start Time  Latest Start Time   Slack Time");
+    puts("-----------------------------------------------------------");
     for (int v = 1; v <= nodeCnt; ++v)
         printf("%-5d %-9d %-9d %-5d%s\n",
                v, earliest[v], latest[v], slack[v],
@@ -240,33 +223,33 @@ static void printResults(void)
     printf("Project length: %d\n", earliest[nodeCnt]);
 }
 
-static void cleanup(void)
-{
+// Free all allocated edges in graph
+static void cleanup(void) {
     for (int u = 1; u <= nodeCnt; ++u) {
         Edge *e = head[u];
-        while (e) { Edge *nxt = e->nxt; free(e); e = nxt; }
+        while (e) { Edge *nxt = e->nxt;
+            free(e); e = nxt;
+        }
         head[u] = tail_[u] = NULL;
     }
 }
 
-/* ---- main -------------------------------------------------------------- */
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     bool wantDot = false;
     const char *file = INPUT_FILE;
-
+    // load data, display activities, run CPM, cleanup
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "-g") == 0)  wantDot = true;
         else file = argv[i];
     }
 
     readFile(file);
-    printActivityList();
-    forwardPass();
-    backwardPass();
-    printResults();
+    printActivityList(); // debug
+    forwardPass(); // computer earliest times
+    backwardPass(); // latest times
+    printResults(); // output
 
     if (wantDot) exportDot();
-    cleanup();
+    cleanup(); // free from malloc
     return 0;
 }
