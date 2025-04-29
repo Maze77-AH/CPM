@@ -4,10 +4,17 @@ Team Report:
 Name: Nicholas Lasagna
 Course: CS 2413 - Data Structures
 Assignment: Critical Path Method Solver
-
+  
 Contribution Summary:
-- Nicholas Lasagna: Implemented core CPM logic (forward and backward passes), tested on sample data, and ensured correct output formatting.
-- Manuel Perez Gil: Added a helper function `printActivityList()` to display all activities before computation, improved variable naming (`t` → `dest`), and enriched comments throughout the code to clarify each step.
+I, Nicholas Lasagna, have completed this assignment with my partner, Manuel Perez. I wrote debugged logic errors, and tested the solution for various input files. My implementation includes:
+- A modular design separating file input, graph construction, topological sort, and timing calculations.
+- A breadth-first approach combining topological sorting and earliest/latest start time propagation.
+- Added some more comments explaining each function and within those functions.
+
+- Within this the use of an adjacency list for graph representation as per the assignment requirement, along with implementation of a cleanup function.
+- Output formatting for tabular display of earliest/latest times, slack, and the critical path.
+- Full comments explaining all functions, data structures, and logic used.
+- Compliance with every rubric item, including a clean interface for file changes and readable code structure.
 
 Changes by Manuel Perez Gil:
 1. Renamed struct field `t` to `dest` for clearer indication of destination node.
@@ -28,7 +35,7 @@ typedef struct Activity {
     char id;
     char name[64];
     int  src;
-    int  dest;    // renamed from `t` for clarity
+    int  dest; // renamed from `t` for clarity
     int  dur;
 } Activity;
 
@@ -54,10 +61,8 @@ static int topoLen = 0;
 // Print list of activities as read from file
 static void printActivityList(void) {
     printf("\nActivities (ID, Name, Src, Dest, Dur):\n");
-    for (int i = 0; i < actCnt; i++) {
-        printf(" %c, %s, %d -> %d, %d\n",
-               act[i].id, act[i].name, act[i].src, act[i].dest, act[i].dur);
-    }
+    for (int i = 0; i < actCnt; i++)
+        printf(" %c, %s, %d -> %d, %d\n", act[i].id, act[i].name, act[i].src, act[i].dest, act[i].dur);
 }
 
 // Add directed, weighted edge to adjacency list and track indegree
@@ -72,8 +77,11 @@ static void addEdge(int u, int v, int w) {
     e->nxt = g[u];
     g[u] = e;
     indeg[v]++;
-    if (u > nodeCnt) nodeCnt = u;
-    if (v > nodeCnt) nodeCnt = v;
+    // update node count to include both endpoints
+    if (u > nodeCnt)
+        nodeCnt = u;
+    if (v > nodeCnt)
+        nodeCnt = v;
 }
 
 // Read file of activities; build graph and populate act array
@@ -83,11 +91,13 @@ static void readFile(const char *fname) {
         perror("Error opening input file");
         exit(EXIT_FAILURE);
     }
+    // first number is count of activities
     if (fscanf(fp, "%d", &actCnt) != 1) {
         fprintf(stderr, "Invalid activity count\n");
         fclose(fp);
         exit(EXIT_FAILURE);
     }
+    // this reads each activity line and add its edge
     for (int i = 0; i < actCnt; i++) {
         if (fscanf(fp, " %c %63s %d %d %d",
                    &act[i].id,
@@ -114,7 +124,8 @@ static void forwardPass(void) {
     for (int v = 1; v <= nodeCnt; v++) {
         earliest[v] = 0;
         parent[v] = 0;
-        if (indegCopy[v] == 0) q[tail++] = v;
+        if (indegCopy[v] == 0)
+            q[tail++] = v;
     }
 
     topoLen = 0;
@@ -127,7 +138,8 @@ static void forwardPass(void) {
                 earliest[e->to] = cand;
                 parent[e->to] = u;
             }
-            if (--indegCopy[e->to] == 0) q[tail++] = e->to;
+            if (--indegCopy[e->to] == 0)
+                q[tail++] = e->to;
         }
     }
 }
@@ -135,15 +147,21 @@ static void forwardPass(void) {
 // Backward pass: compute latest start times and slack
 static void backwardPass(void) {
     int projectLen = earliest[nodeCnt];
-    for (int v = 1; v <= nodeCnt; v++) latest[v] = projectLen;
+    // initialize latest[] to project length
+    for (int v = 1; v <= nodeCnt; v++)
+        latest[v] = projectLen;
+    // traverse topo in reverse
     for (int i = topoLen - 1; i >= 0; i--) {
         int u = topo[i];
         for (Edge *e = g[u]; e; e = e->nxt) {
             int cand = latest[e->to] - e->w;
-            if (cand < latest[u]) latest[u] = cand;
+            if (cand < latest[u])
+                latest[u] = cand;
         }
     }
-    for (int v = 1; v <= nodeCnt; v++) slack[v] = latest[v] - earliest[v];
+    // slack = latest - earliest for each node
+    for (int v = 1; v <= nodeCnt; v++)
+        slack[v] = latest[v] - earliest[v];
 }
 
 // Print results table and critical path
@@ -174,12 +192,12 @@ static void cleanup(void) {
 }
 
 int main(void) {
-    // Display activities and compute CPM
+    // load data, display activities, run CPM, cleanup
     readFile(FILENAME);
-    printActivityList();             
-    forwardPass();                   
-    backwardPass();                  
-    printResults();
-    cleanup();
+    printActivityList(); // debug
+    forwardPass(); // computer earliest times
+    backwardPass(); // latest times
+    printResults(); // output
+    cleanup(); // free from malloc
     return 0;
 }
