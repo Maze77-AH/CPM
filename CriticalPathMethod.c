@@ -2,12 +2,10 @@
  ============================================================================
   Critical Path Method Solver   |   CS 2413 – Spring 2025
   ---------------------------------------------------------------------------
-  Team Report
-
-    Contribution Summary:
-    I, Nicholas Lasagna, have completed this assignment with my partner,
-    Manuel Perez. I wrote debugged logic errors, and tested the solution for
-    various input files. My implementation includes:
+  Contribution Summary:
+  I, Nicholas Lasagna, have completed this assignment with my partner,
+  Manuel Perez. I wrote debugged logic errors, and tested the solution for
+  various input files. My implementation includes:
     - A modular design separating file input, graph construction,
       topological sort, and timing calculations.
     - A breadth-first approach combining topological sorting and
@@ -24,12 +22,15 @@
     - Compliance with every rubric item, including a clean interface for
       file changes and readable code structure.
 
-    Manuel Perez Gil – Added the full file-I/O layer and #define/argv filename
-    override, ensured adjacency lists keep input order, implemented cycle
-    detection with graceful error, provided optional Graphviz DOT export (-g),
-    introduced zero-slack markers in the table, refactored code layout,
-    improved variable names, and added documentation.
+  Manuel Perez Gil – Added the full file-I/O layer and #define/argv filename
+  override, ensured adjacency lists keep input order, **rewrote the reader to
+  treat the first number as the vertex count (fixing the 7-vs-8 confusion in
+  `furniture.txt`)**, implemented cycle detection with graceful error,
+  provided optional Graphviz DOT export (-g), introduced zero-slack markers in
+  the table, refactored code layout, improved variable names, and added
+  documentation.
 
+  Notification e-mailed to instructor: 22 Apr 2025 09:27 A.M. (UTC-05)
   ---------------------------------------------------------------------------
   Extra-credit delivered
     1. Cycle detection + user-friendly abort
@@ -37,6 +38,7 @@
     3. Filename override via command-line argument
  ============================================================================
 */
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -46,7 +48,7 @@
 /* ---- configuration ---------------------------------------------------- */
 #define MAX_ACT      100
 #define MAX_NODE     100
-#define INPUT_FILE   "furniture.txt"       
+#define INPUT_FILE   "furniture.txt"         
 
 /* ---- data types -------------------------------------------------------- */
 typedef struct Activity {
@@ -61,10 +63,10 @@ typedef struct Edge {
     struct Edge *nxt;
 } Edge;
 
-/* ---- globals -------------------------------- */
+/* ---- globals ----------------------------------------------------------- */
 static Activity act[MAX_ACT];
-static Edge   *head[MAX_NODE + 1] = {NULL};     
-static Edge   *tail_[MAX_NODE + 1] = {NULL};    
+static Edge   *head[MAX_NODE + 1] = {NULL};
+static Edge   *tail_[MAX_NODE + 1] = {NULL};
 static int     indeg [MAX_NODE + 1] = {0};
 static int     earliest[MAX_NODE + 1] = {0};
 static int     latest  [MAX_NODE + 1] = {0};
@@ -77,8 +79,6 @@ static int nodeCnt = 0;
 static int topoLen = 0;
 
 /* ---- helpers ----------------------------------------------------------- */
-
-/* append edge u→v (weight w) preserving original order */
 static void addEdge(int u, int v, int w)
 {
     Edge *e = malloc(sizeof *e);
@@ -93,30 +93,60 @@ static void addEdge(int u, int v, int w)
     if (v > nodeCnt) nodeCnt = v;
 }
 
-/* load activities, build graph */
+/* ------------------------------------------------------------------
+   Read CPM file:
+   • first line = vertex count (used for sanity only)
+   • remaining lines = activities until EOF
+-------------------------------------------------------------------*/
 static void readFile(const char *fname)
 {
     FILE *fp = fopen(fname, "r");
     if (!fp) { perror(fname); exit(EXIT_FAILURE); }
 
-    if (fscanf(fp, "%d", &actCnt) != 1 || actCnt > MAX_ACT) {
-        fprintf(stderr, "Bad activity count\n");
+    int nodeCntHint = 0;
+    if (fscanf(fp, "%d", &nodeCntHint) != 1 ||
+        nodeCntHint < 2 || nodeCntHint > MAX_NODE)
+    {
+        fprintf(stderr, "Bad vertex count on first line\n");
         exit(EXIT_FAILURE);
     }
-    for (int i = 0; i < actCnt; ++i) {
-        if (fscanf(fp, " %c %63s %d %d %d",
-                   &act[i].id, act[i].name,
-                   &act[i].src, &act[i].dest, &act[i].dur) != 5)
-        {
-            fprintf(stderr, "Malformed line %d\n", i + 2);
+
+    /* discard rest of first line */
+    int ch;
+    while ((ch = fgetc(fp)) != '\n' && ch != EOF) /* skip */;
+
+    char line[256];
+    actCnt = 0;
+    while (fgets(line, sizeof line, fp)) {
+        if (line[0] == '\n' || line[0] == '#') continue;   
+
+        if (actCnt >= MAX_ACT) {
+            fprintf(stderr, "Error: too many activities (>%d)\n", MAX_ACT);
             exit(EXIT_FAILURE);
         }
-        addEdge(act[i].src, act[i].dest, act[i].dur);
+
+        if (sscanf(line, " %c %63s %d %d %d",
+                   &act[actCnt].id, act[actCnt].name,
+                   &act[actCnt].src, &act[actCnt].dest,
+                   &act[actCnt].dur) != 5)
+        {
+            fprintf(stderr, "Malformed activity line near: %s", line);
+            exit(EXIT_FAILURE);
+        }
+
+        addEdge(act[actCnt].src, act[actCnt].dest, act[actCnt].dur);
+        actCnt++;
     }
     fclose(fp);
+
+    if (nodeCntHint != nodeCnt) {
+        fprintf(stderr,
+                "Warning: file says %d vertices, but activities reference up to %d\n",
+                nodeCntHint, nodeCnt);
+    }
 }
 
-/* Kahn BFS topological sort + longest-path relaxation */
+/* ---- CPM passes -------------------------------------------------------- */
 static void forwardPass(void)
 {
     int q[MAX_NODE + 1], h = 0, t = 0;
@@ -141,13 +171,12 @@ static void forwardPass(void)
         }
     }
 
-    if (topoLen < nodeCnt) {          /* cycle detection */
+    if (topoLen < nodeCnt) {
         fprintf(stderr, "Error: input graph contains a cycle – CPM undefined.\n");
         exit(EXIT_FAILURE);
     }
 }
 
-/* reverse pass to compute latest times and slack */
 static void backwardPass(void)
 {
     const int projectLen = earliest[nodeCnt];
@@ -163,17 +192,17 @@ static void backwardPass(void)
         slack[v] = latest[v] - earliest[v];
 }
 
+/* ---- printing & cleanup ------------------------------------------------ */
 static void printActivityList(void)
 {
     puts("\nActivities (ID, Name, Src, Dest, Dur)");
     puts("---------------------------------------");
     for (int i = 0; i < actCnt; ++i)
-        printf(" %c  %-12s %2d → %2d   %3d\n",
+        printf(" %c  %-20s %2d → %2d   %3d\n",
                act[i].id, act[i].name,
                act[i].src, act[i].dest, act[i].dur);
 }
 
-/* optional Graphviz export: run with ./cpm -g */
 static void exportDot(void)
 {
     FILE *fp = fopen("cpm.dot", "w");
@@ -190,7 +219,7 @@ static void exportDot(void)
         }
     fputs("}\n", fp);
     fclose(fp);
-    puts("DOT file 'cpm.dot' written (open with Graphviz).");
+    puts("DOT file 'cpm.dot' written.");
 }
 
 static void printResults(void)
@@ -234,7 +263,6 @@ int main(int argc, char *argv[])
 
     readFile(file);
     printActivityList();
-
     forwardPass();
     backwardPass();
     printResults();
