@@ -1,5 +1,5 @@
 ```bash
-gcc -std=c17 -Wall -Wextra -O2 Perez_Lasagna_CPM.c -o cpm
+gcc -std=c17 -Wall -Wextra -O2 CriticalPathMethod.c -o cpm
 ./cpm                 # default input: furniture.txt
 ./cpm otherInput.txt  # run with a different data file
 ./cpm -g              # generate Graphviz DOT file
