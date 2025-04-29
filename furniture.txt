@@ -1,4 +1,4 @@
-8
+7
 A Build_Legs             1   2  11
 B Build_Top              1   3   3
 C Build_Drawer           1   4  10
