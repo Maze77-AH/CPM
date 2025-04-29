@@ -29,8 +29,7 @@
   provided optional Graphviz DOT export (-g), introduced zero-slack markers in
   the table, refactored code layout, improved variable names, and added
   documentation.
-
-  Notification e-mailed to instructor: 22 Apr 2025 09:27 A.M. (UTC-05)
+  
   ---------------------------------------------------------------------------
   Extra-credit delivered
     1. Cycle detection + user-friendly abort
