@@ -1,0 +1,15 @@
+11
+A Feasibility_Study           1   2   3
+B Risk_Assessment             1   3   2
+C Team_Formation              1   4   1
+D Requirements_Analysis       2   5   4
+E Prototype_Design            3   5   2
+F Environment_Configuration   4   6   3
+G Core_Development            5   7   5
+H Feature_Integration         5   8   2
+I Module_Testing              6   8   4
+J UX_Review                   6   9   1
+K Beta_Release                7  11   6
+L Performance_Optimization    8  10   2
+M User_Documentation          9  10   4
+N Project_Handover            10 11   1
