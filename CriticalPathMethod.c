@@ -31,9 +31,11 @@
     1. Cycle detection + user-friendly abort
     2. Graphviz export highlighting the critical path
     3. Filename override via command-line argument
-*/
 
-// Our GitHub: https://github.com/Maze77-AH/CPM
+    Our GitHub: https://github.com/Maze77-AH/CPM
+    Nicholas: Maze77-AH
+    Manuel: MEMOMG8
+*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -142,7 +144,8 @@ static void forwardPass(void) {
 
     for (int v = 1; v <= nodeCnt; ++v) {
         earliest[v] = 0; parent[v] = 0;
-        if (indegTmp[v] == 0) q[t++] = v;
+        if (indegTmp[v] == 0)
+            q[t++] = v;
     }
 
     topoLen = 0;
@@ -169,7 +172,8 @@ static void forwardPass(void) {
 static void backwardPass(void) {
     const int projectLen = earliest[nodeCnt];
     // initialize latest[] to project length
-    for (int v = 1; v <= nodeCnt; ++v) latest[v] = projectLen;
+    for (int v = 1; v <= nodeCnt; ++v)
+        latest[v] = projectLen;
     // traverse topo in reverse
     for (int i = topoLen - 1; i >= 0; --i) {
         int u = topo[i];
@@ -206,12 +210,10 @@ static void exportDot(void) {
 
 // Print results table and critical path
 static void printResults(void) {
-    puts("\nNode  Earliest Start Time  Latest Start Time   Slack Time");
-    puts("-----------------------------------------------------------");
+    puts("\nNode  Earliest Start Time     Latest Start Time     Slack Time");
+    puts("-----------------------------------------------------------------");
     for (int v = 1; v <= nodeCnt; ++v)
-        printf("%-5d %-9d %-9d %-5d%s\n",
-               v, earliest[v], latest[v], slack[v],
-               slack[v] == 0 ? "  *" : "");
+        printf("%-5d        %-9d        %-9d               %-5d%s\n", v, earliest[v], latest[v], slack[v], slack[v] == 0 ? "     *" : "");
 
     int path[MAX_NODE + 1], len = 0;
     for (int cur = nodeCnt; cur; cur = parent[cur]) path[len++] = cur;
@@ -239,8 +241,10 @@ int main(int argc, char *argv[]) {
     const char *file = INPUT_FILE;
     // load data, display activities, run CPM, cleanup
     for (int i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], "-g") == 0)  wantDot = true;
-        else file = argv[i];
+        if (strcmp(argv[i], "-g") == 0)
+            wantDot = true;
+        else
+            file = argv[i];
     }
 
     readFile(file);
@@ -249,7 +253,8 @@ int main(int argc, char *argv[]) {
     backwardPass(); // latest times
     printResults(); // output
 
-    if (wantDot) exportDot();
+    if (wantDot)
+        exportDot();
     cleanup(); // free from malloc
     return 0;
 }
